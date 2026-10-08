@@ -32,7 +32,7 @@ jobs:
               echo "No code changes were pushed today."
             else
               FIRST=$(echo "$COMMITS" | tail -1)
-              BASE=$(git rev-parse "$FIRST^" 2>/dev/null || git hash-object -t tree /dev/null)
+              BASE=$(git rev-parse --verify --quiet "$FIRST^" || git hash-object -t tree /dev/null)
 
               echo "## Summary"
               echo "- Commits: $(echo "$COMMITS" | wc -l)"
