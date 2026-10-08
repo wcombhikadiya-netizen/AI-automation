@@ -51,7 +51,7 @@ jobs:
               git diff -U2 $BASE HEAD -- . ':!reports' | head -n $MAX_LINES
               echo '```'
               TOTAL=$(git diff -U2 $BASE HEAD -- . ':!reports' | wc -l)
-              [ "$TOTAL" -gt "$MAX_LINES" ] && echo "_Diff truncated: showing $MAX_LINES of $TOTAL lines._"
+                 if [ "$TOTAL" -gt "$MAX_LINES" ]; then echo "_Diff truncated: showing $MAX_LINES of $TOTAL lines._"; fi
             fi
           } > "$FILE"
 
