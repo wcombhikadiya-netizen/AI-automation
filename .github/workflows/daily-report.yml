@@ -2,8 +2,8 @@ name: Daily Work Report
 
 on:
   schedule:
-    - cron: '30 12 * * *'   # 12:30 UTC = 6:00 PM IST, every day
-  workflow_dispatch:         # manual "Run workflow" button for testing
+    - cron: '30 12 * * *'   # 12:30 UTC = 6:00 PM IST
+  workflow_dispatch:
 
 permissions:
   contents: write
