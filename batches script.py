@@ -1,0 +1,42 @@
+import os
+import shutil
+from pathlib import Path
+
+# ====== CONFIG ======
+SOURCE_DIR = r"D:\Jayjools\Script\jayjools_image_downloader\jayjools_images\products"      # folder containing the 11,317 images
+OUTPUT_DIR = r"D:\Jayjools\Script\jayjools_image_downloader\jayjools_images\Images batch"           # where batch folders will be created
+BATCH_SIZE = 200
+MOVE_FILES = False                           # True = move, False = copy
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".svg", ".avif"}
+# ====================
+
+def main():
+    src = Path(SOURCE_DIR)
+    out = Path(OUTPUT_DIR)
+    out.mkdir(parents=True, exist_ok=True)
+
+    # Collect images (top level only; use rglob("*") to include subfolders)
+    images = sorted(
+        f for f in src.iterdir()
+        if f.is_file() and f.suffix.lower() in IMAGE_EXTS
+    )
+
+    total = len(images)
+    print(f"Found {total} images")
+
+    action = shutil.move if MOVE_FILES else shutil.copy2
+
+    for i in range(0, total, BATCH_SIZE):
+        batch_num = i // BATCH_SIZE + 1
+        batch_dir = out / f"batch_{batch_num:03d}"
+        batch_dir.mkdir(exist_ok=True)
+
+        for img in images[i:i + BATCH_SIZE]:
+            action(str(img), str(batch_dir / img.name))
+
+        print(f"batch_{batch_num:03d}: {len(images[i:i + BATCH_SIZE])} files")
+
+    print(f"Done. Created {(total + BATCH_SIZE - 1) // BATCH_SIZE} folders.")
+
+if __name__ == "__main__":
+    main()
