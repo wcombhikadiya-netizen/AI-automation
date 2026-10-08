@@ -8,50 +8,66 @@ on:
 permissions:
   contents: write
 
+env:
+  REPORT_BRANCH: main   # the branch your work lands on (e.g. main, live, staging)
+
 jobs:
   report:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ env.REPORT_BRANCH }}
           fetch-depth: 0
 
       - name: Build daily report
         run: |
+          # Files/folders to leave OUT of the report. Add more as needed, e.g. ':!assets/*.min.js'
+          EXCLUDE=(':!reports' ':!.github' ':!README.md' ':!config/settings_data.json')
+
           TODAY=$(TZ=Asia/Kolkata date +%F)
           SINCE="$TODAY 00:00 +0530"
           mkdir -p reports
           FILE="reports/$TODAY.md"
           MAX_LINES=800
 
-          COMMITS=$(git log --since="$SINCE" --format=%H -- . ':!reports')
+          COMMITS=$(git log --since="$SINCE" --format=%H -- . "${EXCLUDE[@]}")
           {
             echo "# Daily Work Report - $TODAY"
             echo
             if [ -z "$COMMITS" ]; then
               echo "No code changes were pushed today."
             else
-              FIRST=$(echo "$COMMITS" | tail -1)
-              BASE=$(git rev-parse --verify --quiet "$FIRST^" || git hash-object -t tree /dev/null)
+              # Compare against how the branch looked at the end of yesterday
+              BASE=$(git rev-list -1 --first-parent --before="$SINCE" HEAD || true)
+              [ -z "$BASE" ] && BASE=$(git hash-object -t tree /dev/null)
+              git diff -U2 "$BASE" HEAD -- . "${EXCLUDE[@]}" > /tmp/day.diff
+              TOTAL=$(wc -l < /tmp/day.diff)
+
+              ALL=$(git log --no-merges --since="$SINCE" --format='%an|- %s (%an, %h)' -- . "${EXCLUDE[@]}")
+              DEV=$(echo "$ALL" | grep -iv '^shopify' | cut -d'|' -f2- || true)
+              EDITOR=$(echo "$ALL" | grep -ic '^shopify' || true)
 
               echo "## Summary"
-              echo "- Commits: $(echo "$COMMITS" | wc -l)"
-              echo "- Overall change:$(git diff --shortstat $BASE HEAD -- . ':!reports')"
+              echo "- Developer commits: $(echo -n "$DEV" | grep -c '^' || true)"
+              echo "- Theme editor saves (Shopify): $EDITOR"
+              echo "- Overall change:$(git diff --shortstat "$BASE" HEAD -- . "${EXCLUDE[@]}")"
               echo
               echo "## Commits"
-              git log --since="$SINCE" --format='- %s (%an, %h)' -- . ':!reports'
+              if [ -n "$DEV" ]; then echo "$DEV"; else echo "_No developer commits today._"; fi
               echo
               echo "## Files changed"
               echo '```'
-              git diff --stat $BASE HEAD -- . ':!reports'
+              git diff --stat=120 "$BASE" HEAD -- . "${EXCLUDE[@]}"
               echo '```'
               echo
               echo "## Code changes (green = added, red = removed)"
               echo '```diff'
-              git diff -U2 $BASE HEAD -- . ':!reports' | head -n $MAX_LINES
+              head -n "$MAX_LINES" /tmp/day.diff
               echo '```'
-              TOTAL=$(git diff -U2 $BASE HEAD -- . ':!reports' | wc -l)
-                 if [ "$TOTAL" -gt "$MAX_LINES" ]; then echo "_Diff truncated: showing $MAX_LINES of $TOTAL lines._"; fi
+              if [ "$TOTAL" -gt "$MAX_LINES" ]; then
+                echo "_Diff truncated: showing $MAX_LINES of $TOTAL lines._"
+              fi
             fi
           } > "$FILE"
 
@@ -61,4 +77,5 @@ jobs:
           git config user.email "bot@users.noreply.github.com"
           git add reports/
           git diff --cached --quiet || git commit -m "chore: daily report [skip ci]"
-          git push
+          git pull --rebase origin "$REPORT_BRANCH"
+          git push origin HEAD:"$REPORT_BRANCH"
